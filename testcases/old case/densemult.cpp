@@ -12,7 +12,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <iomanip>
-#include <sstream>
 #include "ArgumentManager.h"
 
 bool is_number(const std::string &);
@@ -68,33 +67,6 @@ class MatrixMultiply
         }
     }
 
-    void checkInvalidInput(std::string filename)
-    {
-        ifstream cinFile;
-        cinFile.open(filename);
-        std::string str;
-        while (getline(cinFile, str))
-        {
-            if (str.empty())
-            {
-                std::cout << "ERROR: file is empty" << std::endl;
-                error();
-            }
-            std::stringstream ss(str);
-            std::string word;
-            while (ss >> word)
-            {
-                std::cout << word << std::boolalpha << ", is_number " << is_number(word) << std::endl;
-                if (!(is_number(word)))
-                {
-                    std::cout << "Number error: " << word << std::endl;
-                    error();
-                }
-            }
-        }
-        cinFile.close();
-    }
-
     /**
     * @brief Determine if the input is number
     * @param input string the number that will be checked 
@@ -105,8 +77,8 @@ class MatrixMultiply
         {
             if (!isdigit(input.at(i)))
             {
-                // Check if we encounter "." or "-" or "\n" or " "
-                if (input.at(i) == '.' || input.at(i) == '-')
+                // Check if we encounter "."
+                if (input.at(i) == '.')
                 {
                     if (!isdigit(input.at(i + 1)))
                     {
@@ -123,12 +95,55 @@ class MatrixMultiply
         return true;
     }
 
+    /**
+     * @brief parse each line(row) to double variables
+     * 
+     * @param line line to parse
+     * @param count calculates column count, pass by reference
+     * @return double* returns double pointer to array of the line
+     */
+    double *parseLine(const std::string &line, int &column_count)
+    {
+        std::string delim = " ";
+        std::string current;
+        column_count = 0;
+        double *p = new double[20]; // create dynamic array
+
+        auto start = 0U;
+        auto end = line.find(delim);
+        while (end != std::string::npos)
+        {
+            current = line.substr(start, end - start);
+            if (!(is_number(current)))
+            {
+                error();
+            }
+
+            // convert the parsed string to double and store it in the p dynamic array
+            p[column_count] = std::stod(current);
+            column_count++;
+
+            //std::cout << current << std::endl;
+            start = end + delim.length();
+            end = line.find(delim, start);
+        }
+        current = line.substr(start, end);
+        p[column_count] = std::stod(current);
+        column_count++;
+        //std::cout << current << std::endl;
+        if (!(is_number(current)))
+        {
+            error();
+        }
+        //std::cout << "Column Count: " << column_count + 1 << std::endl;
+
+        return p;
+    }
+
   public:
     MatrixMultiply(std::string fileNameA, std::string fileNameB, std::string fileNameC)
     {
         outfilename = fileNameC;
-        checkInvalidInput(fileNameA);
-        checkInvalidInput(fileNameB);
         readMatrices(fileNameA, fileNameB);
         checkMatrixSizes();
         denseMultiply();
@@ -140,7 +155,7 @@ class MatrixMultiply
      * @param fileNameA coming from the argument A
      * @param fileNameB coming from the argument B
      */
-    void readMatrices(std::string fileNameA, std::string fileNameB)
+    bool readMatrices(std::string fileNameA, std::string fileNameB)
     {
         ifstream infile;
         std::string *p;
@@ -148,7 +163,6 @@ class MatrixMultiply
         int *row_count = 0;
         int column_count = 0;
         double *row;
-        row = new double[20];
 
         //////////////////////////////
         // Matrix A Process Start
@@ -158,24 +172,18 @@ class MatrixMultiply
         p = new std::string;
         row_count = new int(0);
 
-        while (getline(infile, *p))
+        // Find row count
+        while (!infile.eof())
         {
-            column_count = 0;
-            std::stringstream ss(*p);
-            double num;
-            // if (!(ss >> num))
-            //     error();
-            while (ss >> num)
-            {
-                row[column_count] = num;
-                column_count++;
-            }
+            getline(infile, *p);
+
+            row = parseLine(*p, column_count);
+
             for (int i = 0; i < column_count; i++)
             {
                 matrixA[*row_count][i] = row[i];
             }
             (*row_count)++;
-            std::cout << std::endl;
         }
 
         infile.close();
@@ -185,38 +193,31 @@ class MatrixMultiply
 
         printMatrixA();
 
-        delete row;
-        delete row_count;
         delete p;
-        // //////////////////////////////
-        // // Matrix A Process Finished
-        // //////////////////////////////
+        //////////////////////////////
+        // Matrix A Process Finished
+        //////////////////////////////
 
-        // //////////////////////////////
-        // // Matrix B Process Start
-        // //////////////////////////////
+        //////////////////////////////
+        // Matrix B Process Start
+        //////////////////////////////
 
         infile.open(fileNameB);
         p = new std::string;
         row_count = new int(0);
-        row = new double[20];
 
-        while (getline(infile, *p))
+        // Find row count
+        while (!infile.eof())
         {
-            column_count = 0;
-            std::stringstream ss(*p);
-            double num;
-            while (ss >> num)
-            {
-                row[column_count] = num;
-                column_count++;
-            }
+            getline(infile, *p);
+
+            row = parseLine(*p, column_count);
+
             for (int i = 0; i < column_count; i++)
             {
                 matrixB[*row_count][i] = row[i];
             }
             (*row_count)++;
-            std::cout << std::endl;
         }
 
         infile.close();
@@ -226,13 +227,21 @@ class MatrixMultiply
 
         printMatrixB();
 
-        delete row;
-        delete row_count;
         delete p;
     }
 
     void denseMultiply()
     {
+        // Matrix A = 1x3 Matrix B = 3x4 Matrix C= 1x4
+        //std::cout << matrixA[0][0] << " " << matrixA[0][1];
+        // for (int i = 0; i < matrixB_row_count; i++)
+        // {
+        //     for (int j = 0; j < matrixA_column_count; j++)
+        //     {
+        //         matrixC[0][i] += matrixA[i][j] * matrixB[j][i];
+        //     }
+        // }
+
         for (int i = 0; i < matrixA_row_count; ++i)
             for (int j = 0; j < matrixB_column_count; ++j)
                 for (int k = 0; k < matrixA_column_count; ++k)
@@ -249,7 +258,6 @@ class MatrixMultiply
      */
     void printMatrixA()
     {
-        std::cout << showpoint << fixed << std::setprecision(2);
         std::cout << std::endl;
         std::cout << "================ " << std::endl;
         std::cout << "Matrix A (" << matrixA_row_count << "x" << matrixA_column_count << ")" << std::endl;
@@ -272,7 +280,6 @@ class MatrixMultiply
      */
     void printMatrixB()
     {
-        std::cout << showpoint << fixed << std::setprecision(2);
         std::cout << std::endl;
         std::cout << "================ " << std::endl;
         std::cout << "Matrix B (" << matrixB_row_count << "x" << matrixB_column_count << ")" << std::endl;
@@ -326,7 +333,6 @@ class MatrixMultiply
             }
             outfile << std::endl;
         }
-        outfile << std::endl;
     }
 };
 
