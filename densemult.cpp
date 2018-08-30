@@ -72,11 +72,18 @@ class MatrixMultiply
         return true;
     }
 
-    double *parseLine(const std::string &line, int &count)
+    /**
+     * @brief parse each line(row) to double variables
+     * 
+     * @param line line to parse
+     * @param count calculates column count, pass by reference
+     * @return double* returns double pointer to array of the line
+     */
+    double *parseLine(const std::string &line, int &column_count)
     {
         std::string delim = " ";
         std::string current;
-        count = 0;
+        column_count = 0;
         double *p = new double[20]; // create dynamic array
 
         auto start = 0U;
@@ -90,22 +97,22 @@ class MatrixMultiply
             }
 
             // convert the parsed string to double and store it in the p dynamic array
-            p[count] = std::stod(current);
-            count++;
+            p[column_count] = std::stod(current);
+            column_count++;
 
             //std::cout << current << std::endl;
             start = end + delim.length();
             end = line.find(delim, start);
         }
         current = line.substr(start, end);
-        p[count] = std::stod(current);
-        count++;
+        p[column_count] = std::stod(current);
+        column_count++;
         //std::cout << current << std::endl;
         if (!(is_number(current)))
         {
             error();
         }
-        //std::cout << "Column Count: " << count + 1 << std::endl;
+        //std::cout << "Column Count: " << column_count + 1 << std::endl;
 
         return p;
     }
@@ -114,15 +121,15 @@ class MatrixMultiply
     MatrixMultiply(std::string fileNameA, std::string fileNameB, std::string fileNameC)
     {
         outfilename = fileNameC;
-        readMatrix(fileNameA, fileNameB);
+        readMatrices(fileNameA, fileNameB);
     }
 
     /**
-     * @brief Read and store the matrix to the private members
+     * @brief Read and store the matrices to the private members
      * @param fileNameA coming from the argument A
      * @param fileNameB coming from the argument B
      */
-    bool readMatrix(std::string fileNameA, std::string fileNameB)
+    bool readMatrices(std::string fileNameA, std::string fileNameB)
     {
         ifstream infile;
         std::string *p;
@@ -130,6 +137,10 @@ class MatrixMultiply
         int *row_count = 0;
         int column_count = 0;
         double *row;
+
+        //////////////////////////////
+        // Matrix A Process Start
+        //////////////////////////////
 
         infile.open(fileNameA);
         p = new std::string;
@@ -160,8 +171,49 @@ class MatrixMultiply
         printMatrixA();
 
         delete p;
+        //////////////////////////////
+        // Matrix A Process Finished
+        //////////////////////////////
+
+        //////////////////////////////
+        // Matrix B Process Start
+        //////////////////////////////
+
+        infile.open(fileNameB);
+        p = new std::string;
+        row_count = new int(0);
+
+        // Find row count
+        while (!infile.eof())
+        {
+            getline(infile, *p);
+
+            row = parseLine(*p, column_count);
+
+            for (int i = 0; i < column_count; i++)
+            {
+                matrixB[*row_count][i] = row[i];
+            }
+            (*row_count)++;
+        }
+
+        infile.close();
+
+        matrixB_column_count = column_count;
+        matrixB_row_count = *row_count;
+
+        std::cout << "MATRIX B ROW COUNT: " << *row_count << std::endl;
+        std::cout << "MATRIX B COLUMN COUNT: " << column_count << std::endl;
+
+        printMatrixB();
+
+        delete p;
     }
 
+    /**
+     * @brief print Matrix A
+     * 
+     */
     void printMatrixA()
     {
         std::cout << "======== " << std::endl;
@@ -177,6 +229,10 @@ class MatrixMultiply
         }
     }
 
+    /**
+     * @brief Print Matrix B
+     * 
+     */
     void printMatrixB()
     {
         std::cout << "======== " << std::endl;
